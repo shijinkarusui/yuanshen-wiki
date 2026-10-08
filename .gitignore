@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+*.local
+
+# DB / runtime
+*.log
+*.pid
+/tmp/
+.pgdata/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups / screenshots (local only)
+backups/
+shots/
+*.zip
