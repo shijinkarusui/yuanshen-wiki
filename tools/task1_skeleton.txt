@@ -1,0 +1,51 @@
+# 任务1：项目骨架（Linux 版 M00B）
+
+你是这个项目的实现者。我是集成人，只接收按下面协议输出的文件。
+
+## 输出协议（必须严格遵守）
+- 只输出文件块，不写任何解释、前言、总结。
+- 每个文件格式：
+### FILE: 相对路径
+```语言
+文件内容
+```
+- 相对路径以项目根为基准，例如 `compose.yaml`、`backend/Dockerfile`。
+- 不要输出绝对路径。
+
+## 背景
+项目：语言学论辩 Wiki 与知识图谱 MVP。后端 Python 3.12 + FastAPI + Pydantic v2 + SQLAlchemy 2 + Alembic + psycopg3；前端 React + TypeScript + Vite + TanStack Query；数据库 PostgreSQL 16；Docker Compose v2 部署。**只做 Linux**，不要任何 Windows/PowerShell 内容，脚本全部用 bash (.sh)。
+
+## Compose 拓扑（compose.yaml，Linux Docker Engine）
+- `db`: `postgres:16` 镜像，命名卷持久化数据，不发布宿主机端口，healthcheck 用 `pg_isready`。
+- `migrate`: 基于 backend 镜像，一次性运行 `alembic upgrade head` 后退出，依赖 db 健康。
+- `api`: 基于 backend 镜像，运行 uvicorn，等待 db 健康且 migrate 成功。环境变量读 `.env`。
+- `web`: 基于 frontend 构建产物 + nginx，提供静态文件，`/api` 反向代理到 `api:8000`，只映射 `127.0.0.1:8080:8080`。
+- 所有服务都在默认网络，可被 `docker compose config` 校验。
+
+## 需要输出的文件清单
+1. `compose.yaml` — 如上拓扑。
+2. `backend/Dockerfile` — python:3.12-slim，安装 pyproject 依赖，默认 CMD 跑 uvicorn（migrate 服务用 command 覆盖）。
+3. `backend/pyproject.toml` — 依赖：fastapi、pydantic>=2、pydantic-settings、sqlalchemy>=2、alembic、psycopg[binary]、uvicorn[standard]、argon2-cffi、python-multipart、pytest、httpx。选你确知的可用版本，用 >= 下限 + < 大版本上限。
+4. `backend/alembic.ini` + `backend/migrations/env.py` + `backend/migrations/script.py.mako` — 标准 Alembic 骨架，env.py 从 `backend/app/db/base.py` 导入 metadata（该文件本任务也创建，可为空 registry），支持离线/在线模式。本任务不需要实际 revision 文件（任务2再建）。
+5. `backend/app/__init__.py`、`backend/app/main.py` — FastAPI 应用：挂载 `/api/v1` 路由（含 `backend/app/api/router.py` 聚合器，本任务创建空聚合器并预留 `include_router` 位置）；实现 `GET /api/v1/ops/live`、`GET /api/v1/ops/ready`（检查 DB 连接，失败 503）、`GET /api/v1/ops/version`（返回固定 version 字符串）。
+6. `backend/app/api/__init__.py`、`backend/app/api/router.py` — 空聚合器。
+7. `backend/app/core/__init__.py`、`backend/app/core/config.py` — pydantic-settings：DATABASE_URL、SECRET_KEY、PUBLIC_ORIGIN，默认 DATABASE_URL 指向 compose 内 `db`。
+8. `backend/app/db/__init__.py`、`backend/app/db/base.py` — declarative base + metadata registry（空，供 Alembic 导入）。
+9. `frontend/Dockerfile` — 多阶段：node:22-slim 构建（npm ci + npm run build），nginx:alpine 运行，复制 `nginx.conf`。
+10. `frontend/nginx.conf` — root 指向构建产物，SPA fallback，`/api/` 反向代理到 `http://api:8000`（注意 compose 内服务名）。
+11. `frontend/package.json` — react、react-dom、@tanstack/react-query、react-router-dom、typescript、vite、@vitejs/plugin-react；scripts: dev、build、typecheck、preview。vite.config.ts 用默认 react 模板配置。
+12. `frontend/tsconfig.json`、`frontend/index.html`、`frontend/src/main.tsx`、`frontend/src/App.tsx` — 最小可构建入口，App.tsx 渲染一句 "LingDebate Wiki MVP" 占位。
+13. `.env.example` — POSTGRES_PASSWORD、SECRET_KEY、PUBLIC_ORIGIN 示例值并注明必须替换。
+14. `.gitignore` — python、node、.env、卷数据。
+15. `scripts/doctor.sh` — 检查 docker、compose v2、8080 端口可用。
+16. `scripts/start.sh` — docker compose up --build -d，等待 healthy，输出访问地址。
+17. `scripts/stop.sh` — docker compose down（默认不删卷）。
+18. `README.md` — Linux 快速开始：依赖、配置 .env、start/stop、访问地址、当前状态（骨架）。
+
+## 验收标准（我会逐项验证）
+- `docker compose config` 通过。
+- backend 镜像可构建，`python -c "import app.main"` 无 ImportError（结构正确即可）。
+- frontend `npm ci && npm run build` 能通过（我会实际跑）。
+- 所有 .sh 有执行权限位意图（写文件时我会 chmod +x）。
+
+现在只输出文件块。
